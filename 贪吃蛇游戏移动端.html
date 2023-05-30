@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>贪吃蛇游戏</title>
+  <style>
+     /* 设置样式 */
+     html, body {
+      height: 100%;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+    }
+    #game {
+      position: relative;
+      width: 100%;
+      height: 90%;
+      background-color: #eee;
+    }
+    .snake, .food {
+      position: absolute;
+      width: 10%;
+      height: 10%;
+      box-sizing: border-box;
+      background-color: #333;
+      border-radius: 50%;
+      border: 1px solid #fff;
+    }
+    .snake {
+      background-color: #51b74a;
+    }
+    button {
+      display: block;
+      margin: 10px auto;
+      font-size: 16px;
+      padding: 5px 20px;
+      border-radius: 5px;
+      background-color: #3399ff;
+      color: #fff;
+      border: none;
+      outline: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+  <button id="start-btn">开始游戏</button>
+  <button id="end-btn" style="display: none;">结束游戏</button>
+  <script>
+   // 获取 DOM 元素
+    const gameEl = document.getElementById('game');
+    const startBtn = document.getElementById('start-btn');
+    const endBtn = document.getElementById('end-btn');
+
+    // 游戏参数
+    const CELL_SIZE = Math.floor(Math.min(window.innerWidth, window.innerHeight) / 20); // 方格大小
+    const ROWS = Math.floor(gameEl.offsetHeight / CELL_SIZE); // 行数
+    const COLS = Math.floor(gameEl.offsetWidth / CELL_SIZE); // 列数
+    const START_LENGTH = 3; // 蛇的初始长度
+    const MOVE_INTERVAL = 200; // 移动间隔
+
+    // 游戏状态
+    let snake = [], // 蛇的位置和方向
+        food = null, // 食物块的位置
+        currentDirection = 'right', // 当前蛇头的移动方向
+        intervalId = null, // 定时器 ID
+        score = 0, // 玩家得分
+        isPlaying = false; // 游戏是否正在进行中
+
+    // 初始化游戏
+    function init() {
+    // 初始化蛇
+    const startRow = Math.floor(ROWS / 2);
+    const startCol = Math.floor(COLS / 2);
+
+    for (let i = 0; i < START_LENGTH; i++) {
+        snake.push([startRow, startCol - i]);
+    }
+
+    // 初始化食物块
+    generateFood();
+
+    // 更新界面
+    render();
+    }
+
+    // 随机生成食物块的位置
+    function generateFood() {
+    let row, col;
+
+    do {
+        row = Math.floor(Math.random() * ROWS);
+        col = Math.floor(Math.random() * COLS);
+    } while (isOccupiedBySnake(row, col));
+
+    food = [row, col];
+    }
+
+    // 更新游戏状态
+    function update() {
+    // 根据当前方向移动蛇头
+    const head = snake[0];
+    let newRow = head[0],
+        newCol = head[1];
+
+    switch (currentDirection) {
+        case 'up':
+        newRow--;
+        break;
+        case 'down':
+        newRow++;
+        break;
+        case 'left':
+        newCol--;
+        break;
+        case 'right':
+        newCol++;
+        break;
+    }
+
+    // 判断是否吃到了食物块
+    if (newRow === food[0] && newCol === food[1]) {
+        score++;
+        generateFood();
+    } else {
+        snake.pop(); // 移动蛇尾
+    }
+
+    // 判断是否碰到了边界或自身
+    if (newRow < 0 || newRow >= ROWS || newCol < 0 || newCol >= COLS || isOccupiedBySnake(newRow, newCol)) {
+        clearInterval(intervalId);
+        alert(`游戏结束，得分：${score}`);
+        isPlaying = false;
+        endBtn.style.display = 'none';
+        startBtn.style.display = 'block';
+        return;
+    }
+
+    // 在蛇头位置插入新的头部
+    snake.unshift([newRow, newCol]);
+
+    // 更新界面
+    render();
+    }
+
+    // 判断某个位置是否被蛇占据
+    function isOccupiedBySnake(row, col) {
+    return snake.some(segment => segment[0] === row && segment[1] === col);
+    }
+
+    // 渲染游戏界面
+    function render() {
+    // 清空游戏区域
+    gameEl.innerHTML = '';
+
+    // 绘制蛇
+    snake.forEach(segment => {
+        const [row, col] = segment;
+        const left = col * CELL_SIZE;
+        const top = row * CELL_SIZE;
+
+        const snakeEl = document.createElement('div');
+        snakeEl.className = 'snake';
+        snakeEl.style.left = `${left}px`;
+        snakeEl.style.top = `${top}px`;
+
+        gameEl.appendChild(snakeEl);
+    });
+
+    // 绘制食物块
+    const [row, col] = food;
+    const left = col * CELL_SIZE;
+    const top = row * CELL_SIZE;
+
+    const foodEl = document.createElement('div');
+    foodEl.className = 'food';
+    foodEl.style.left = `${left}px`;
+    foodEl.style.top = `${top}px`;
+
+    gameEl.appendChild(foodEl);
+    }
+
+    // 开始游戏函数
+    function startGame() {
+      
+    if (isPlaying) {
+        return;
+    }
+
+    const START_ROW = 5;
+    const START_COL = 5;
+    // 重置游戏状态和得分
+    score = 0;
+    snake = [[START_ROW, START_COL]];
+    currentDirection = 'right';
+    generateFood();
+    isPlaying = true;
+
+    // 隐藏开始按钮，显示终止按钮
+    startBtn.style.display = 'none';
+    endBtn.style.display = 'block';
+
+    // 开始定时器
+    intervalId = setInterval(update, MOVE_INTERVAL);
+
+    // 渲染游戏界面
+    render();
+    }
+
+    // 结束游戏函数
+    function endGame() {
+    if (!isPlaying) {
+        return;
+    }
+
+    clearInterval(intervalId);
+    alert(`游戏结束，得分：${score}`);
+    isPlaying = false;
+    endBtn.style.display = 'none';
+    startBtn.style.display = 'block';
+    }
+
+    // 监听触摸事件
+    let startX, startY;
+
+    document.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    });
+
+    document.addEventListener('touchend', e => {
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+
+    const deltaX = endX - startX;
+    const deltaY = endY - startY;
+
+    if (Math.abs(deltaX) > Math.abs(deltaY)) { // 横向滑动
+        if (deltaX > 0 && currentDirection !== 'left') {
+        currentDirection = 'right';
+        } else if (deltaX < 0 && currentDirection !== 'right') {
+        currentDirection = 'left';
+        }
+    } else { // 纵向滑动
+        if (deltaY > 0 && currentDirection !== 'up') {
+        currentDirection = 'down';
+        } else if (deltaY < 0 && currentDirection !== 'down') {
+        currentDirection = 'up';
+        }
+    }
+    });
+
+    // 初始化游戏并添加按钮事件监听器
+    init();
+    startBtn.addEventListener('click', startGame);
+    endBtn.addEventListener('click', endGame);
+
+  </script>
+</body>
+</html>

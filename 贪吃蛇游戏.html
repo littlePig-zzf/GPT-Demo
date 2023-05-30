@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>H5贪吃蛇游戏</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #fff;
+        font-family: Arial, sans-serif;
+      }
+      .game-field {
+        display: flex;
+        flex-wrap: wrap;
+        position: relative;
+        width: 320px; /* 设置宽度为屏幕宽度的 80% */
+        height: 320px;
+        margin: auto;
+        border: 2px solid #000;
+      }
+
+      .snake-block,
+        .food-block {
+        position: absolute;
+        width: 20px; /* 与 blockSize 保持一致 */
+        height: 20px; /* 与 blockSize 保持一致 */
+        background-color: #06c;
+        border-radius: 50%;
+        }
+
+      .food-block {
+        background-color: #ff4136;
+      }
+
+      .score {
+        text-align: center;
+        font-size: 24px;
+        margin-top: 20px;
+      }
+
+      .overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100px;
+        background-color: rgba(0, 0, 0, 0.7);
+        display: none;
+        justify-content: center;
+        align-items: center;
+        z-index: 1;
+      }
+
+      .overlay p {
+        color: #fff;
+        font-size: 36px;
+        text-align: center;
+      }
+
+      .start-button {
+        display: block;
+        margin: 20px auto;
+        padding: 10px;
+        font-size: 24px;
+        background-color: #4caf50;
+        color: #fff;
+        border: none;
+        cursor: pointer;
+        outline: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="game-field"></div>
+    <div class="score">得分：0</div>
+    <button class="start-button">开始游戏</button>
+    <div class="overlay">
+      <p>按 Enter 开始游戏</p>
+    </div>
+
+    <script>
+      // 游戏状态枚举
+      const GameStatus = {
+        STOPPED: 0,
+        RUNNING: 1,
+        PAUSED: 2,
+      };
+
+      // 方向枚举
+      const Direction = {
+        UP: 'UP',
+        DOWN: 'DOWN',
+        LEFT: 'LEFT',
+        RIGHT: 'RIGHT',
+      };
+
+      // 食物类
+      class Food {
+        constructor(x, y) {
+          this.x = x;
+          this.y = y;
+        }
+      }
+
+      // 蛇类
+      class Snake {
+        constructor() {
+          // 初始化蛇身
+          this.head = { x: 10, y: 10 };
+          this.body = [];
+          for (let i = 0; i < 3; i++) {
+            this.body.push({ x: 10 - i - 1, y: 10 });
+          }
+        }
+
+        move(direction) {
+          // 移动蛇头
+          switch (direction) {
+            case Direction.UP:
+              this.head.y -= 1;
+              break;
+            case Direction.DOWN:
+              this.head.y += 1;
+              break;
+            case Direction.LEFT:
+              this.head.x -= 1;
+              break;
+            case Direction.RIGHT:
+              this.head.x += 1;
+              break;
+            default:
+              break;
+          }
+
+          // 移动蛇身
+          for (let i = this.body.length - 1; i > 0; i--) {
+            this.body[i].x = this.body[i - 1].x;
+            this.body[i].y = this.body[i - 1].y;
+          }
+          if (this.body.length > 0) {
+            this.body[0].x = this.head.x;
+            this.body[0].y = this.head.y;
+          }
+        }
+
+        grow() {
+          // 增加蛇身长度
+          this.body.push({ x: this.body[this.body.length - 1].x, y: this.body[this.body.length - 1].y });
+        }
+
+        collideWithWall(fieldWidth, fieldHeight) {
+          // 判断蛇头是否撞墙
+          return this.head.x < 0 || this.head.x >= fieldWidth || this.head.y < 0 || this.head.y >= fieldHeight;
+        }
+
+        collideWithBody() {
+            // 判断是否与自己的身体相撞
+            for (let i = 1; i < this.body.length; i++) { // 循环条件从 1 开始
+            if (this.head.x === this.body[i].x && this.head.y === this.body[i].y) {
+                return true;
+            }
+            }
+            return false;
+        }
+      }
+
+      // 游戏组件
+      class Game {
+        constructor(fieldWidth, fieldHeight, blockSize) {
+          this.fieldWidth = fieldWidth;
+          this.fieldHeight = fieldHeight;
+          this.blockSize = blockSize;
+          this.gameStatus = GameStatus.STOPPED;
+          this.score = 0;
+          this.direction = null;
+
+          // 初始化游戏区域
+          this.field = document.querySelector('.game-field');
+          this.field.innerHTML = '';
+          for (let y = 0; y < this.fieldHeight; y++) {
+            for (let x = 0; x < this.fieldWidth; x++) {
+              const div = document.createElement('div');
+              div.style.width = `${this.blockSize}px`;
+              div.style.height = `${this.blockSize}px`;
+              div.style.position = 'absolute';
+              div.style.left = `${x * this.blockSize}px`;
+              div.style.top = `${y * this.blockSize}px`;
+              this.field.appendChild(div);
+            }
+          }
+          
+
+          // 初始化蛇和食物
+          this.snake = new Snake();
+          this.food = this.generateFoodLocation();
+          this.renderSnakeAndFood();
+
+          // 绑定键盘事件
+          document.addEventListener('keydown', (e) => {
+            switch (e.key) {
+              case 'ArrowUp':
+                if (this.direction !== Direction.DOWN) this.direction = Direction.UP;
+                break;
+              case 'ArrowDown':
+                if (this.direction !== Direction.UP) this.direction = Direction.DOWN;
+                break;
+              case 'ArrowLeft':
+                if (this.direction !== Direction.RIGHT) this.direction = Direction.LEFT;
+                break;
+              case 'ArrowRight':
+                if (this.direction !== Direction.LEFT) this.direction = Direction.RIGHT;
+                break;
+              case 'Enter':
+                if (this.gameStatus === GameStatus.STOPPED) this.startGame();
+                else if (this.gameStatus === GameStatus.PAUSED) this.resumeGame();
+                break;
+              case 'Escape':
+                if (this.gameStatus === GameStatus.RUNNING) this.pauseGame();
+                break;
+              default:
+                break;
+            }
+          });
+
+          // 绑定开始游戏按钮点击事件
+        document.querySelector('.start-button').addEventListener('click', () => {
+            this.startGame();
+        });
+    }
+
+    startGame() {
+      // 开始新游戏
+      this.gameStatus = GameStatus.RUNNING;
+      this.score = 0;
+      this.direction = Direction.RIGHT;
+      this.snake = new Snake();
+      this.food = this.generateFoodLocation();
+      this.hideOverlay();
+      this.updateScore();
+      this.food = this.generateFoodLocation();
+      this.startGameLoop();
+    }
+
+    pauseGame() {
+      // 暂停游戏
+      this.gameStatus = GameStatus.PAUSED;
+      this.showOverlay('游戏已暂停');
+    }
+
+    resumeGame() {
+      // 恢复游戏
+      this.gameStatus = GameStatus.RUNNING;
+      this.hideOverlay();
+      this.startGameLoop();
+    }
+
+    endGame() {
+      // 结束游戏
+      this.gameStatus = GameStatus.STOPPED;
+      this.showOverlay(`游戏结束，得分：${this.score}`);
+    }
+
+    startGameLoop() {
+      // 游戏循环
+      const loop = setInterval(() => {
+        this.snake.move(this.direction);
+        if (this.snake.head.x === this.food.x && this.snake.head.y === this.food.y) {
+          // 吃到食物了
+          this.snake.grow();
+          this.score += 10;
+          this.updateScore();
+          this.food = this.generateFoodLocation();
+        }
+        if (this.snake.collideWithWall(this.fieldWidth, this.fieldHeight) || this.snake.collideWithBody()) {
+          // 撞到墙或身体了
+          clearInterval(loop);
+          this.endGame();
+        }
+        this.renderSnakeAndFood();
+      }, 100);
+    }
+
+    generateFoodLocation() {
+    // 随机生成食物位置，并确保其不与蛇身体的位置重叠
+    let x = Math.floor(Math.random() * this.fieldWidth);
+    let y = Math.floor(Math.random() * this.fieldHeight);
+    while (this.snake.body.some((block) => block.x === x && block.y === y)) {
+      x = Math.floor(Math.random() * this.fieldWidth);
+      y = Math.floor(Math.random() * this.fieldHeight);
+    }
+    return new Food(x, y);
+  }
+
+    updateScore() {
+      // 更新得分显示
+      document.querySelector('.score').textContent = `得分：${this.score}`;
+    }
+
+    renderSnakeAndFood() {
+        // 渲染蛇和食物到游戏区域
+        const snakeBlocks = document.querySelectorAll('.snake-block');
+        snakeBlocks.forEach((block) => block.remove());
+        const foodBlock = document.querySelector('.food-block');
+        if (foodBlock) foodBlock.remove();
+        
+        const snakeBody = [...this.snake.body];
+        snakeBody.unshift(this.snake.head);
+        snakeBody.forEach((block) => {
+            const div = document.createElement('div');
+            div.classList.add('snake-block');
+            div.style.left = `${block.x * this.blockSize}px`;
+            div.style.top = `${block.y * this.blockSize}px`;
+            this.field.appendChild(div);
+        });
+
+        const foodDiv = document.createElement('div');
+        foodDiv.classList.add('food-block');
+        foodDiv.style.left = `${this.food.x * this.blockSize}px`;
+        foodDiv.style.top = `${this.food.y * this.blockSize}px`;
+        this.field.appendChild(foodDiv);
+    }
+
+    showOverlay(text) {
+        // 显示提示覆盖层
+        const overlay = document.querySelector('.overlay');
+        overlay.innerHTML = `<p>${text}</p>`;
+        overlay.style.display = 'flex';
+    }
+
+    hideOverlay() {
+      // 隐藏提示覆盖层
+      const overlay = document.querySelector('.overlay');
+      overlay.style.display = 'none';
+    }
+  }
+
+  // 创建游戏实例并启动
+  const game = new Game(15, 15, 20);
+//   game.showOverlay('按 Enter 开始游戏');
+</script>
+</body>
+</html>
+

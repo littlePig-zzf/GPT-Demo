@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>五子棋</title>
+	<style>
+		#game-board {
+			width: 300px;
+			height: 300px;
+			border: 1px solid #ccc;
+			position: relative;
+            background-color: #d18b47;
+		}
+		.piece {
+			width: 20px;
+			height: 20px;
+			border-radius: 10px;
+			background-color: transparent;
+			position: absolute;
+			left: -10px;
+			top: -10px;
+			cursor: pointer;
+		}
+		.black {
+			background-color: black;
+		}
+		.white {
+			background-color: white;
+			border: 1px solid #ccc;
+		}
+		.guide {
+			width: 20px;
+			height: 20px;
+			border-radius: 10px;
+			border: 1px solid #ccc;
+			position: absolute;
+			left: -10px;
+			top: -10px;
+			opacity: 0.5;
+		}
+	</style>
+</head>
+<body>
+	<h1>五子棋</h1>
+	<canvas id="game-board" width="300" height="300"></canvas>
+	<script>
+        var gameBoard = document.getElementById("game-board");
+        var context = gameBoard.getContext("2d");
+        var pieces = [];
+        var player = "black";
+        var isGuideVisible = true;
+        var guideX = -1;
+        var guideY = -1;
+        var gameIsOver = false;
+        var winLineStart = {x: -1, y: -1};
+        var winLineEnd = {x: -1, y: -1};
+
+        function drawBoard() {
+            context.clearRect(0, 0, 300, 300);
+            for (var i = 0; i < 15; i++) {
+                context.beginPath();
+                context.moveTo(15 + i * 20, 15);
+                context.lineTo(15 + i * 20, 285);
+                context.stroke();
+                context.beginPath();
+                context.moveTo(15, 15 + i * 20);
+                context.lineTo(285, 15 + i * 20);
+                context.stroke();
+            }
+        }
+
+        function drawPieces() {
+            for (var i = 0; i < pieces.length; i++) {
+                var piece = pieces[i];
+                context.beginPath();
+                context.arc(piece.x * 20 + 15, piece.y * 20 + 15, 10, 0, Math.PI * 2);
+                context.fillStyle = piece.color;
+                context.fill();
+            }
+        }
+
+        function addPiece(x, y) {
+            if (x < 0 || x > 14 || y < 0 || y > 14 || gameIsOver) {
+                return;
+            }
+            for (var i = 0; i < pieces.length; i++) {
+                if (pieces[i].x === x && pieces[i].y === y) {
+                    return;
+                }
+            }
+            var piece = {x: x, y: y, color: player};
+            pieces.push(piece);
+            drawPieces();
+            checkWin();
+            switchPlayer();
+        }
+
+        function switchPlayer() {
+            player = (player === "black" ? "white" : "black");
+        }
+
+        function showGuide(x, y) {
+            if (!isGuideVisible || gameIsOver) {
+                return;
+            }
+            hideGuide();
+            guideX = x;
+            guideY = y;
+            var guide = document.createElement("div");
+            guide.className = "guide";
+            guide.style.left = (x * 20 + 5) + "px";
+            guide.style.top = (y * 20 + 5) + "px";
+            gameBoard.appendChild(guide);
+        }
+
+        function hideGuide() {
+            guideX = -1;
+            guideY = -1;
+            var guides = document.getElementsByClassName("guide");
+            for (var i = 0; i < guides.length; i++) {
+                guides[i].parentNode.removeChild(guides[i]);
+            }
+        }
+
+        function startGame() {
+            drawBoard();
+            gameBoard.addEventListener("click", function(event) {
+                addPiece(Math.round((event.clientX - gameBoard.getBoundingClientRect().left - 10) / 20),
+                        Math.round((event.clientY - gameBoard.getBoundingClientRect().top - 10) / 20));
+            });
+            gameBoard.addEventListener("mousemove", function(event) {
+                showGuide(Math.round((event.clientX - gameBoard.getBoundingClientRect().left - 10) / 20),
+                        Math.round((event.clientY - gameBoard.getBoundingClientRect().top - 10) / 20));
+            });
+            gameBoard.addEventListener("mouseleave", function(event) {
+                hideGuide();
+            });
+        }
+
+        function checkWin() {
+            var directions = [
+                {x: 1, y: 0}, {x: 1, y: 1}, {x: 0, y: 1}, {x: -1, y: 1}
+            ];
+            for (var i = 0; i < pieces.length; i++) {
+                var piece = pieces[i];
+                for (var j = 0; j < directions.length; j++) {
+                    var count = 0;
+                    var lineStart = {x: piece.x, y: piece.y};
+                    var lineEnd = {x: piece.x, y: piece.y};
+                    while (count < 4) {
+                        lineStart.x -= directions[j].x;
+                        lineStart.y -= directions[j].y;
+                        if (lineStart.x < 0 || lineStart.x > 14 || lineStart.y < 0 || lineStart.y > 14) {
+                            break;
+                        }
+                        if (pieces.find(p => p.x === lineStart.x && p.y === lineStart.y && p.color === piece.color)) {
+                            count++;
+                        } else {
+                            break;
+                        }
+                    }
+                    while (count < 4) {
+                        lineEnd.x += directions[j].x;
+                        lineEnd.y += directions[j].y;
+                        if (lineEnd.x < 0 || lineEnd.x > 14 || lineEnd.y < 0 || lineEnd.y > 14) {
+                            break;
+                        }
+                        if (pieces.find(p => p.x === lineEnd.x && p.y === lineEnd.y && p.color === piece.color)) {
+                            count++;
+                        } else {
+                            break;
+                        }
+                    }
+                    if (count === 4) {
+                        gameIsOver = true;
+                        winLineStart = lineStart;
+                        winLineEnd = lineEnd;
+                        alert(piece.color + " wins!");
+                        return;
+                    }
+                }
+            }
+        }
+
+        startGame();
+
+    </script>
+</body>
+</html>
+
+
